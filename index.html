@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Registro de Ponto</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&family=Barlow:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --accent: #00e5a0;
+    --accent-dim: rgba(0,229,160,0.12);
+    --accent-glow: rgba(0,229,160,0.3);
+    --text: #e8eaf0;
+    --text-muted: #6b7080;
+    --danger: #ff4d6a;
+    --warning: #ffb020;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Barlow', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  /* TOP BAR */
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background: rgba(15,17,23,0.95);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+
+  .top-bar .logo {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .top-bar .time {
+    font-family: var(--mono);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 2px;
+  }
+
+  .top-bar .date {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-align: right;
+  }
+
+  /* SCREENS */
+  .screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    padding: 28px 20px 24px;
+    gap: 20px;
+    overflow-y: auto;
+  }
+
+  .screen.active { display: flex; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .screen.active > * {
+    animation: fadeUp 0.3s ease both;
+  }
+  .screen.active > *:nth-child(2) { animation-delay: 0.05s; }
+  .screen.active > *:nth-child(3) { animation-delay: 0.1s; }
+  .screen.active > *:nth-child(4) { animation-delay: 0.15s; }
+
+  /* CARD */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px 24px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-size: 36px;
+    font-weight: 800;
+    line-height: 1.15;
+    margin-bottom: 10px;
+  }
+
+  .subtitle {
+    font-size: 17px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  /* FINGERPRINT */
+  .fp-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 16px 0 8px;
+  }
+
+  .fp-btn {
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.3s ease;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .fp-btn:active { transform: scale(0.95); }
+
+  .fp-btn.scanning {
+    border-color: var(--accent);
+    animation: pulse 1.2s ease infinite;
+  }
+
+  .fp-btn.success {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .fp-btn.error {
+    border-color: var(--danger);
+    animation: shake 0.4s ease;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+    50% { box-shadow: 0 0 0 24px transparent; }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+  }
+
+  .fp-icon { width: 80px; height: 80px; opacity: 0.5; transition: opacity 0.3s; color: var(--text); }
+  .fp-btn.scanning .fp-icon,
+  .fp-btn.success .fp-icon { opacity: 1; color: var(--accent); }
+  .fp-btn.error .fp-icon { color: var(--danger); opacity: 1; }
+
+  .fp-status {
+    font-family: var(--mono);
+    font-size: 14px;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    min-height: 22px;
+    transition: color 0.3s;
+  }
+  .fp-status.ok { color: var(--accent); }
+  .fp-status.err { color: var(--danger); }
+
+  /* EMPLOYEE DISPLAY */
+  .employee-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 22px 20px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(0,229,160,0.25);
+    border-radius: 16px;
+    width: 100%;
+  }
+
+  .employee-display .emp-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .employee-display .emp-name {
+    font-size: 34px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: 0.5px;
+  }
+
+  /* TIPO BUTTONS */
+  .tipo-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    width: 100%;
+  }
+
+  .tipo-btn {
+    padding: 28px 12px;
+    border-radius: 16px;
+    border: 2px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+  }
+
+  .tipo-btn span.icon { font-size: 32px; }
+
+  .tipo-btn:not(:disabled):active { transform: scale(0.96); }
+
+  .tipo-btn:not(:disabled):hover,
+  .tipo-btn:not(:disabled):active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .tipo-btn.selected {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .tipo-btn:disabled {
+    opacity: 0.2;
+    cursor: not-allowed;
+  }
+
+  .tipo-btn .blocked-label {
+    position: absolute;
+    bottom: 8px;
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text-muted);
+    letter-spacing: 1px;
+  }
+
+  /* BUTTONS */
+  .btn {
+    width: 100%;
+    padding: 20px 24px;
+    border-radius: 14px;
+    border: none;
+    font-family: var(--sans);
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.5px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .btn:active { transform: scale(0.98); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0f1117;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: #00ffb3;
+    box-shadow: 0 4px 24px var(--accent-glow);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    font-size: 18px;
+  }
+
+  .btn-ghost:hover { border-color: var(--text-muted); color: var(--text); }
+
+  /* CONFIRM */
+  .confirm-icon { font-size: 72px; line-height: 1; }
+
+  .confirm-details {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .confirm-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .confirm-row .lbl {
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .confirm-row .val {
+    font-weight: 700;
+    font-family: var(--mono);
+    font-size: 16px;
+  }
+
+  .confirm-row .val.accent { color: var(--accent); font-size: 18px; }
+
+  /* SAVING */
+  .loader {
+    display: inline-block;
+    width: 22px; height: 22px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .saving-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 16px;
+    color: var(--text-muted);
+    justify-content: center;
+    margin-top: 16px;
+  }
+
+  /* CONFIG */
+  .config-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 20px;
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 200;
+  }
+
+  .config-btn:hover { border-color: var(--text-muted); color: var(--text); }
+
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(4px);
+    z-index: 300;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .modal-overlay.active { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px 24px 0 0;
+    padding: 28px 24px 36px;
+    width: 100%;
+    max-width: 500px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-height: 85vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s ease;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-handle {
+    width: 40px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto -8px;
+  }
+
+  .modal h2 { font-size: 22px; font-weight: 700; }
+
+  .input-group { display: flex; flex-direction: column; gap: 8px; }
+
+  .input-group label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    letter-spacing: 1px;
+  }
+
+  .input-group input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+
+  .input-group input:focus { border-color: var(--accent); }
+
+  .modal-actions { display: flex; gap: 12px; }
+  .modal-actions .btn { flex: 1; padding: 16px; font-size: 17px; }
+
+  .enroll-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .enroll-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .enroll-item .name { font-size: 18px; font-weight: 700; }
+
+  .enroll-item .status {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+
+  .enroll-item .status.ok { background: var(--accent-dim); color: var(--accent); }
+  .enroll-item .status.pending { background: rgba(255,176,32,0.1); color: var(--warning); }
+
+  .enroll-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--sans);
+  }
+
+  .enroll-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* MSG */
+  .msg-bar {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: var(--mono);
+    z-index: 400;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    white-space: nowrap;
+    max-width: 90vw;
+    text-align: center;
+  }
+
+  .msg-bar.show { opacity: 1; }
+  .msg-bar.success { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); }
+  .msg-bar.error { background: rgba(255,77,106,0.1); border: 1px solid var(--danger); color: var(--danger); }
+
+  /* ENCERRADO */
+  .encerrado-banner {
+    background: rgba(255,77,106,0.08);
+    border: 1px solid rgba(255,77,106,0.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    width: 100%;
+    text-align: center;
+    font-size: 16px;
+    color: var(--danger);
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="logo">Ponto</div>
+  <div class="time" id="clock">--:--:--</div>
+  <div class="date" id="dateDisplay">---</div>
+</div>
+
+<div class="msg-bar" id="msgBar"></div>
+
+<!-- SCREEN HOME -->
+<div class="screen active" id="screen-home">
+  <div class="card">
+    <div class="section-label">Sistema de Ponto</div>
+    <h1>Registrar<br>Ponto</h1>
+    <p class="subtitle">Pressione o botão e coloque o dedo no sensor biométrico</p>
+
+    <div class="fp-container">
+      <button class="fp-btn" id="fpBtn" onclick="startAuth()">
+        <svg class="fp-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M32 8C20 8 10 18 10 30C10 42 20 52 32 52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M32 8C44 8 54 18 54 30C54 42 44 52 32 52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M22 30C22 24.5 26.5 20 32 20C37.5 20 42 24.5 42 30C42 35.5 38 39.5 32 42" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M26 30C26 27 28.7 24.5 32 24.5C35.3 24.5 38 27 38 30C38 33 36 35.5 32 37.5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="32" cy="30" r="2.5" fill="currentColor"/>
+          <path d="M16 22C14 24.5 13 27.1 13 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M48 22C50 24.5 51 27.1 51 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <div class="fp-status" id="fpStatus">Toque para identificar</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN TIPO -->
+<div class="screen" id="screen-tipo">
+  <div class="employee-display">
+    <span class="emp-label">Funcionário identificado</span>
+    <span class="emp-name" id="empName">—</span>
+  </div>
+
+  <div id="encerradoBanner" class="encerrado-banner" style="display:none">
+    ⛔ Ponto encerrado para hoje
+  </div>
+
+  <div class="card" id="tipoCard">
+    <div class="section-label">Tipo de registro</div>
+    <h1 style="font-size:26px;margin-bottom:22px">O que deseja registrar?</h1>
+    <div class="tipo-grid" id="tipoGrid">
+      <button class="tipo-btn" id="btn-Entrada" onclick="selectTipo(this,'Entrada')">
+        <span class="icon">🟢</span>Entrada
+      </button>
+      <button class="tipo-btn" id="btn-Saída" onclick="selectTipo(this,'Saída')">
+        <span class="icon">🔴</span>Saída
+      </button>
+      <button class="tipo-btn" id="btn-Intervalo" onclick="selectTipo(this,'Intervalo')">
+        <span class="icon">🟡</span>Intervalo
+      </button>
+      <button class="tipo-btn" id="btn-Retorno" onclick="selectTipo(this,'Retorno')">
+        <span class="icon">🔵</span>Retorno
+      </button>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="btnConfirmar" onclick="confirmar()" disabled>Confirmar Registro</button>
+  <button class="btn btn-ghost" onclick="goHome()">Cancelar</button>
+</div>
+
+<!-- SCREEN CONFIRM -->
+<div class="screen" id="screen-confirm">
+  <div class="card">
+    <div class="confirm-icon" id="confirmIcon">⏳</div>
+    <h1 style="margin-top:16px;margin-bottom:6px;font-size:32px" id="confirmTitle">Salvando...</h1>
+    <p class="subtitle" id="confirmSub">Aguarde um momento</p>
+
+    <div class="confirm-details" style="margin-top:24px">
+      <div class="confirm-row">
+        <span class="lbl">Funcionário</span>
+        <span class="val" id="confEmp">—</span>
+      </div>
+      <div class="confirm-row">
+        <span class="lbl">Tipo</span>
+        <span class="val accent" id="confTipo">—</span>
+      </div>
+      <div class="confirm-row">
+        <span class="lbl">Hora</span>
+        <span class="val" id="confHora">—</span>
+      </div>
+      <div class="confirm-row">
+        <span class="lbl">Data</span>
+        <span class="val" id="confData">—</span>
+      </div>
+    </div>
+
+    <div class="saving-row" id="savingRow">
+      <div class="loader"></div>
+      Salvando no servidor...
+    </div>
+  </div>
+  <button class="btn btn-primary" id="btnNovoRegistro" style="display:none" onclick="goHome()">Novo Registro</button>
+</div>
+
+<button class="config-btn" onclick="openConfig()" title="Configurações">⚙</button>
+
+<!-- CONFIG MODAL -->
+<div class="modal-overlay" id="configModal" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>⚙ Configurações</h2>
+
+    <div class="input-group">
+      <label>SPREADSHEET ID</label>
+      <input type="text" id="cfgSheetId" placeholder="ID da planilha">
+    </div>
+
+    <div class="input-group">
+      <label>API KEY (Google Sheets)</label>
+      <input type="password" id="cfgApiKey" placeholder="AIza...">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeConfig()">Fechar</button>
+      <button class="btn btn-primary" onclick="saveConfig()">Salvar</button>
+    </div>
+
+    <hr style="border-color:var(--border)">
+    <div class="section-label">Cadastro de Digital</div>
+    <p style="font-size:14px;color:var(--text-muted);margin-top:-8px">Toque em "Cadastrar" ao lado do funcionário para registrar a digital neste aparelho.</p>
+    <div class="enroll-list" id="enrollList"></div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────
+const SPREADSHEET_ID = '1T8-IPyy5QKSzzX6vT2JqxyCLmo6TH3lUQ--jFPUjH58';
+const SHEET_REGISTRO = 'Registro';
+const FUNCIONARIOS = ['Adilson','Magno','Ney','Aline','Jean','Thiago','Hugo','Andrew','Breno'];
+
+let config = {
+  sheetId: localStorage.getItem('sheetId') || SPREADSHEET_ID,
+  apiKey: localStorage.getItem('apiKey') || ''
+};
+
+let currentEmployee = null;
+let selectedTipo = null;
+
+// ── CLOCK ─────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('pt-BR');
+  document.getElementById('dateDisplay').textContent = now.toLocaleDateString('pt-BR', {
+    weekday: 'short', day: '2-digit', month: '2-digit'
+  });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── SCREENS ───────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goHome() {
+  selectedTipo = null;
+  currentEmployee = null;
+  document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('btnConfirmar').disabled = true;
+  resetFpBtn();
+  showScreen('screen-home');
+}
+
+// ── FINGERPRINT ───────────────────────────────────────
+function resetFpBtn() {
+  const btn = document.getElementById('fpBtn');
+  btn.className = 'fp-btn';
+  const st = document.getElementById('fpStatus');
+  st.textContent = 'Toque para identificar';
+  st.className = 'fp-status';
+}
+
+async function startAuth() {
+  const btn = document.getElementById('fpBtn');
+  const st = document.getElementById('fpStatus');
+
+  btn.className = 'fp-btn scanning';
+  st.textContent = 'Lendo digital...';
+  st.className = 'fp-status';
+
+  if (!window.PublicKeyCredential) {
+    btn.className = 'fp-btn error';
+    st.textContent = 'Biometria não suportada';
+    st.className = 'fp-status err';
+    setTimeout(resetFpBtn, 3000);
+    return;
+  }
+
+  try {
+    const enrolled = JSON.parse(localStorage.getItem('enrolled') || '{}');
+    const credIds = Object.keys(enrolled);
+
+    if (credIds.length === 0) {
+      btn.className = 'fp-btn error';
+      st.textContent = 'Nenhuma digital cadastrada';
+      st.className = 'fp-status err';
+      setTimeout(resetFpBtn, 3000);
+      return;
+    }
+
+    const challenge = new Uint8Array(32);
+    crypto.getRandomValues(challenge);
+
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        allowCredentials: credIds.map(id => ({ id: base64ToBuffer(id), type: 'public-key' })),
+        userVerification: 'required',
+        timeout: 30000
+      }
+    });
+
+    const credId = bufferToBase64(assertion.rawId);
+    const employee = enrolled[credId];
+
+    if (employee) {
+      currentEmployee = employee;
+      btn.className = 'fp-btn success';
+      st.textContent = `Identificado: ${employee}`;
+      st.className = 'fp-status ok';
+
+      // Busca registros do dia antes de mostrar tela
+      const registrosDia = await buscarRegistrosDia(employee);
+      setTimeout(() => {
+        document.getElementById('empName').textContent = employee;
+        aplicarRegrasTipo(registrosDia);
+        showScreen('screen-tipo');
+      }, 700);
+    } else {
+      throw new Error('not found');
+    }
+
+  } catch (err) {
+    btn.className = 'fp-btn error';
+    st.textContent = err.name === 'NotAllowedError' ? 'Cancelado' : 'Digital não reconhecida';
+    st.className = 'fp-status err';
+    setTimeout(resetFpBtn, 3000);
+  }
+}
+
+// ── REGRAS DE TIPO ────────────────────────────────────
+// Lógica:
+// Sem registro        → só Entrada
+// Último = Entrada    → Intervalo, Saída
+// Último = Intervalo  → Retorno
+// Último = Retorno    → Intervalo, Saída
+// Último = Saída      → encerrado
+
+function aplicarRegrasTipo(registros) {
+  const todos = ['Entrada','Saída','Intervalo','Retorno'];
+  let permitidos = [];
+  let encerrado = false;
+
+  if (registros.length === 0) {
+    permitidos = ['Entrada'];
+  } else {
+    const ultimo = registros[registros.length - 1];
+    if (ultimo === 'Entrada' || ultimo === 'Retorno') {
+      permitidos = ['Intervalo','Saída'];
+    } else if (ultimo === 'Intervalo') {
+      permitidos = ['Retorno'];
+    } else if (ultimo === 'Saída') {
+      encerrado = true;
+    }
+  }
+
+  // Mostra/oculta banner encerrado
+  document.getElementById('encerradoBanner').style.display = encerrado ? 'block' : 'none';
+  document.getElementById('tipoCard').style.display = encerrado ? 'none' : 'block';
+  document.getElementById('btnConfirmar').style.display = encerrado ? 'none' : 'block';
+
+  if (!encerrado) {
+    todos.forEach(tipo => {
+      const btn = document.getElementById(`btn-${tipo}`);
+      if (permitidos.includes(tipo)) {
+        btn.disabled = false;
+        btn.classList.remove('selected');
+      } else {
+        btn.disabled = true;
+        btn.classList.remove('selected');
+      }
+    });
+    selectedTipo = null;
+    document.getElementById('btnConfirmar').disabled = true;
+  }
+}
+
+// ── BUSCA REGISTROS DO DIA ────────────────────────────
+async function buscarRegistrosDia(funcionario) {
+  if (!config.apiKey) return [];
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${config.sheetId}/values/${SHEET_REGISTRO}!A:D?key=${config.apiKey}`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const rows = data.values || [];
+    // rows: [Data, Funcionário, Hora, Tipo]
+    return rows
+      .filter(r => r[0] === hoje && r[1] === funcionario)
+      .map(r => r[3]);
+  } catch(e) {
+    return [];
+  }
+}
+
+// ── SELECIONA TIPO ────────────────────────────────────
+function selectTipo(btn, tipo) {
+  document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedTipo = tipo;
+  document.getElementById('btnConfirmar').disabled = false;
+}
+
+// ── CONFIRMAR ─────────────────────────────────────────
+async function confirmar() {
+  if (!currentEmployee || !selectedTipo) return;
+
+  const now = new Date();
+  const data = now.toLocaleDateString('pt-BR');
+  const hora = now.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+
+  document.getElementById('confEmp').textContent = currentEmployee;
+  document.getElementById('confTipo').textContent = selectedTipo;
+  document.getElementById('confHora').textContent = hora;
+  document.getElementById('confData').textContent = data;
+  document.getElementById('savingRow').style.display = 'flex';
+  document.getElementById('btnNovoRegistro').style.display = 'none';
+  document.getElementById('confirmIcon').textContent = '⏳';
+  document.getElementById('confirmTitle').textContent = 'Salvando...';
+  document.getElementById('confirmSub').textContent = 'Aguarde um momento';
+
+  showScreen('screen-confirm');
+
+  const ok = await salvarNoSheets(currentEmployee, data, hora, selectedTipo);
+
+  document.getElementById('savingRow').style.display = 'none';
+  document.getElementById('btnNovoRegistro').style.display = 'block';
+
+  if (ok) {
+    document.getElementById('confirmIcon').textContent = '✅';
+    document.getElementById('confirmTitle').textContent = 'Registrado!';
+    document.getElementById('confirmSub').textContent = 'Ponto salvo com sucesso';
+  } else {
+    document.getElementById('confirmIcon').textContent = '⚠️';
+    document.getElementById('confirmTitle').textContent = 'Erro ao salvar';
+    document.getElementById('confirmSub').textContent = 'Verifique a conexão e as configurações';
+  }
+}
+
+// ── GOOGLE SHEETS ─────────────────────────────────────
+async function salvarNoSheets(funcionario, data, hora, tipo) {
+  if (!config.apiKey) { showMsg('API Key não configurada', 'error'); return false; }
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${config.sheetId}/values/${SHEET_REGISTRO}!A:D:append?valueInputOption=USER_ENTERED&key=${config.apiKey}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: [[data, funcionario, hora, tipo]] })
+    });
+    return res.ok;
+  } catch(e) { return false; }
+}
+
+// ── CONFIG MODAL ──────────────────────────────────────
+function openConfig() {
+  document.getElementById('cfgSheetId').value = config.sheetId;
+  document.getElementById('cfgApiKey').value = config.apiKey;
+  renderEnrollList();
+  document.getElementById('configModal').classList.add('active');
+}
+
+function closeConfig() {
+  document.getElementById('configModal').classList.remove('active');
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('configModal')) closeConfig();
+}
+
+function saveConfig() {
+  config.sheetId = document.getElementById('cfgSheetId').value.trim() || SPREADSHEET_ID;
+  config.apiKey = document.getElementById('cfgApiKey').value.trim();
+  localStorage.setItem('sheetId', config.sheetId);
+  localStorage.setItem('apiKey', config.apiKey);
+  showMsg('Configurações salvas', 'success');
+  closeConfig();
+}
+
+// ── ENROLL ────────────────────────────────────────────
+function renderEnrollList() {
+  const enrolled = JSON.parse(localStorage.getItem('enrolled') || '{}');
+  const enrolledNames = Object.values(enrolled);
+  document.getElementById('enrollList').innerHTML = FUNCIONARIOS.map(name => {
+    const ok = enrolledNames.includes(name);
+    return `
+      <div class="enroll-item">
+        <span class="name">${name}</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="status ${ok?'ok':'pending'}">${ok?'✓ OK':'Pendente'}</span>
+          <button class="enroll-btn" onclick="enrollEmployee('${name}')">${ok?'Refazer':'Cadastrar'}</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function enrollEmployee(name) {
+  if (!window.PublicKeyCredential) { showMsg('Biometria não suportada', 'error'); return; }
+  showMsg(`Cadastrando ${name}...`, 'success');
+  try {
+    const challenge = new Uint8Array(32);
+    crypto.getRandomValues(challenge);
+    const userId = new Uint8Array(16);
+    crypto.getRandomValues(userId);
+
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge,
+        rp: { name: 'Ponto', id: location.hostname || 'localhost' },
+        user: { id: userId, name, displayName: name },
+        pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
+        authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+        timeout: 30000
+      }
+    });
+
+    const credId = bufferToBase64(cred.rawId);
+    const enrolled = JSON.parse(localStorage.getItem('enrolled') || '{}');
+    for (const [k,v] of Object.entries(enrolled)) { if (v === name) delete enrolled[k]; }
+    enrolled[credId] = name;
+    localStorage.setItem('enrolled', JSON.stringify(enrolled));
+    showMsg(`Digital de ${name} cadastrada!`, 'success');
+    renderEnrollList();
+  } catch(err) {
+    showMsg(err.name === 'NotAllowedError' ? 'Cancelado' : `Erro: ${err.message}`, 'error');
+  }
+}
+
+// ── UTILS ─────────────────────────────────────────────
+function bufferToBase64(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+function base64ToBuffer(b64) {
+  const s = b64.replace(/-/g,'+').replace(/_/g,'/');
+  return Uint8Array.from(atob(s), c => c.charCodeAt(0)).buffer;
+}
+function showMsg(text, type) {
+  const bar = document.getElementById('msgBar');
+  bar.textContent = text;
+  bar.className = `msg-bar ${type} show`;
+  setTimeout(() => bar.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
