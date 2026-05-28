@@ -1,0 +1,9 @@
+{
+  "name": "Registro de Ponto",
+  "short_name": "Ponto",
+  "display": "standalone",
+  "start_url": "/ponto/",
+  "background_color": "#0f1117",
+  "theme_color": "#00e5a0",
+  "icons": []
+}
