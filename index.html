@@ -623,8 +623,11 @@ async function enrollEmployee(apelido, linha) {
   try {
     const challenge = new Uint8Array(32);
     crypto.getRandomValues(challenge);
-    const userId = new Uint8Array(16);
-    crypto.getRandomValues(userId);
+
+    // userId fixo baseado no apelido — garante que cada funcionário tem ID único e consistente
+    const encoder = new TextEncoder();
+    const apelidoBytes = encoder.encode(apelido.toLowerCase().trim().padEnd(16, '\0').substring(0, 16));
+    const userId = apelidoBytes;
 
     const cred = await navigator.credentials.create({
       publicKey: {
@@ -632,7 +635,7 @@ async function enrollEmployee(apelido, linha) {
         rp: { name: 'Ponto', id: location.hostname },
         user: { id: userId, name: apelido, displayName: apelido },
         pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
-        authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+        authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
         timeout: 30000
       }
     });
