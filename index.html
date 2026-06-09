@@ -193,6 +193,17 @@
   .encerrado-banner { background: rgba(255,77,106,0.08); border: 1px solid rgba(255,77,106,0.3); border-radius: 12px; padding: 16px 20px; width: 100%; text-align: center; font-size: 16px; color: var(--danger); font-weight: 600; }
 
   .loading-funcionarios { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--text-muted); font-family: var(--mono); justify-content: center; padding: 12px 0; }
+
+  .func-item-btn {
+    width: 100%; padding: 22px 20px; border-radius: 14px;
+    border: 2px solid var(--border); background: var(--surface);
+    color: var(--text); font-family: var(--sans); font-size: 22px;
+    font-weight: 700; cursor: pointer; transition: all 0.2s ease;
+    text-align: left;
+  }
+  .func-item-btn:active { transform: scale(0.98); background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .func-item-btn:hover { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+
 </style>
 </head>
 <body>
@@ -210,20 +221,12 @@
   <div class="card">
     <div class="section-label">Sistema de Ponto</div>
     <h1>Registrar<br>Ponto</h1>
-    <p class="subtitle">Pressione o botão e coloque o dedo no sensor biométrico</p>
-    <div class="fp-container">
-      <button class="fp-btn" id="fpBtn" onclick="startAuth()">
-        <svg class="fp-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M32 8C20 8 10 18 10 30C10 42 20 52 32 52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M32 8C44 8 54 18 54 30C54 42 44 52 32 52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M22 30C22 24.5 26.5 20 32 20C37.5 20 42 24.5 42 30C42 35.5 38 39.5 32 42" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M26 30C26 27 28.7 24.5 32 24.5C35.3 24.5 38 27 38 30C38 33 36 35.5 32 37.5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-          <circle cx="32" cy="30" r="2.5" fill="currentColor"/>
-          <path d="M16 22C14 24.5 13 27.1 13 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M48 22C50 24.5 51 27.1 51 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-        </svg>
-      </button>
-      <div class="fp-status" id="fpStatus">Toque para identificar</div>
+    <p class="subtitle">Selecione seu nome e confirme com a digital</p>
+
+    <div style="margin-top:20px;width:100%;display:flex;flex-direction:column;gap:12px" id="funcList">
+      <div class="loading-funcionarios" id="loadingHome">
+        <div class="loader"></div> Carregando...
+      </div>
     </div>
   </div>
 </div>
@@ -308,10 +311,9 @@ const DEFAULT_SHEET_PONTO    = '1T8-IPyy5QKSzzX6vT2JqxyCLmo6TH3lUQ--jFPUjH58';
 const DEFAULT_SHEET_CADASTRO = '1cHfVat4nqC8DwNESZQ4kIsCtYRXlTRwFHsWGJnWB588';
 const APPS_SCRIPT_URL        = 'https://script.google.com/macros/s/AKfycbyRg05kObeUMDwjS3J6F4AZg0KnhlyYvFlwbSMQuPKDgybf6-_1fdCpqoBrK82HFYEl/exec';
 
-// Abas
-const ABA_REGISTRO     = 'Registro';
-const ABA_FUNC_PONTO   = 'Funcionários';  // aba na planilha de Ponto — Apelido(A), CredentialID(B)
-const ABA_FUNC_CADASTRO = 'Funcionários'; // aba na planilha de Cadastro — para gravar CredentialID(D)
+const ABA_REGISTRO      = 'Registro';
+const ABA_FUNC_PONTO    = 'Funcionários';
+const ABA_FUNC_CADASTRO = 'Funcionários';
 
 let config = {
   sheetPonto:    localStorage.getItem('sheetPonto')    || DEFAULT_SHEET_PONTO,
@@ -321,7 +323,7 @@ let config = {
 
 let currentApelido = null;
 let selectedTipo   = null;
-let funcCache      = []; // { apelido, credentialId }
+let funcCache      = [];
 
 // ── CLOCK ─────────────────────────────────────────────
 function updateClock() {
@@ -342,12 +344,77 @@ function goHome() {
   selectedTipo = null; currentApelido = null;
   document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('selected'));
   document.getElementById('btnConfirmar').disabled = true;
-  resetFpBtn();
   showScreen('screen-home');
+  renderFuncList();
+}
+
+// ── LISTA DE FUNCIONÁRIOS NA HOME ─────────────────────
+async function renderFuncList() {
+  const list    = document.getElementById('funcList');
+  const loading = document.getElementById('loadingHome');
+  list.innerHTML = '<div class="loading-funcionarios" id="loadingHome"><div class="loader"></div> Carregando...</div>';
+
+  const funcionarios = await lerFuncionariosPonto();
+  funcCache = funcionarios;
+
+  if (funcionarios.length === 0) {
+    list.innerHTML = '<p style="color:var(--text-muted);font-size:15px;text-align:center;padding:12px">Nenhum funcionário encontrado.<br>Verifique as configurações.</p>';
+    return;
+  }
+
+  list.innerHTML = funcionarios.map(f => `
+    <button class="func-item-btn" onclick="selecionarFuncionario('${f.apelido}')">
+      ${f.apelido}
+    </button>`).join('');
+}
+
+// ── SELECIONA FUNCIONÁRIO E PEDE DIGITAL ──────────────
+async function selecionarFuncionario(apelido) {
+  const funcionario = funcCache.find(f => f.apelido === apelido);
+  if (!funcionario) { showMsg('Funcionário não encontrado', 'error'); return; }
+  if (!funcionario.credentialId) { showMsg(`${apelido} não tem digital cadastrada`, 'error'); return; }
+
+  if (!window.PublicKeyCredential) { showMsg('Biometria não suportada', 'error'); return; }
+
+  showMsg(`Confirmando digital de ${apelido}...`, 'success');
+
+  try {
+    const challenge = new Uint8Array(32);
+    crypto.getRandomValues(challenge);
+
+    // Passa APENAS a credencial desse funcionário
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        allowCredentials: [{ id: base64ToBuffer(funcionario.credentialId), type: 'public-key' }],
+        userVerification: 'required',
+        timeout: 30000
+      }
+    });
+
+    const credId = bufferToBase64(assertion.rawId);
+
+    // Compara com o cadastrado
+    if (credId === funcionario.credentialId) {
+      currentApelido = apelido;
+      const registrosDia = await buscarRegistrosDia(apelido);
+      document.getElementById('empName').textContent = apelido;
+      aplicarRegrasTipo(registrosDia);
+      showScreen('screen-tipo');
+    } else {
+      showMsg('Digital não corresponde! Acesso negado.', 'error');
+    }
+
+  } catch(err) {
+    if (err.name === 'NotAllowedError') {
+      showMsg('Cancelado', 'error');
+    } else {
+      showMsg('Digital não reconhecida', 'error');
+    }
+  }
 }
 
 // ── LÊ FUNCIONÁRIOS (aba Funcionários da planilha Ponto) ──
-// Colunas: A=Apelido, B=CredentialID
 async function lerFuncionariosPonto() {
   if (!config.apiKey) return [];
   try {
@@ -356,14 +423,13 @@ async function lerFuncionariosPonto() {
     if (!res.ok) return [];
     const data = await res.json();
     const rows = data.values || [];
-    return rows.slice(1) // pula cabeçalho
-      .filter(r => r[0] && r[1])
-      .map(r => ({ apelido: r[0].trim(), credentialId: r[1].trim() }));
+    return rows.slice(1)
+      .filter(r => r[0])
+      .map(r => ({ apelido: r[0].trim(), credentialId: (r[1] || '').trim() }));
   } catch(e) { return []; }
 }
 
 // ── LÊ FUNCIONÁRIOS PARA ENROLL (planilha Cadastro) ──
-// Colunas: A=Nome, B=Ativo, C=Apelido, D=CredentialID
 async function lerFuncionariosCadastro() {
   if (!config.apiKey) return [];
   try {
@@ -392,83 +458,6 @@ async function salvarCredentialId(linha, credentialId) {
     const data = await res.json();
     return data.ok === true;
   } catch(e) { return false; }
-}
-
-// ── FINGERPRINT AUTH ──────────────────────────────────
-function resetFpBtn() {
-  document.getElementById('fpBtn').className = 'fp-btn';
-  const st = document.getElementById('fpStatus');
-  st.textContent = 'Toque para identificar';
-  st.className = 'fp-status';
-}
-
-async function startAuth() {
-  const btn = document.getElementById('fpBtn');
-  const st  = document.getElementById('fpStatus');
-
-  btn.className = 'fp-btn scanning';
-  st.textContent = 'Carregando...';
-
-  if (!window.PublicKeyCredential) {
-    btn.className = 'fp-btn error';
-    st.textContent = 'Biometria não suportada';
-    st.className = 'fp-status err';
-    setTimeout(resetFpBtn, 3000);
-    return;
-  }
-
-  // Lê funcionários da aba Funcionários da planilha de Ponto
-  const funcionarios = await lerFuncionariosPonto();
-  funcCache = funcionarios;
-
-  if (funcionarios.length === 0) {
-    btn.className = 'fp-btn error';
-    st.textContent = 'Nenhuma digital cadastrada';
-    st.className = 'fp-status err';
-    setTimeout(resetFpBtn, 3000);
-    return;
-  }
-
-  st.textContent = 'Lendo digital...';
-
-  try {
-    const challenge = new Uint8Array(32);
-    crypto.getRandomValues(challenge);
-
-    const assertion = await navigator.credentials.get({
-      publicKey: {
-        challenge,
-        allowCredentials: funcionarios.map(f => ({ id: base64ToBuffer(f.credentialId), type: 'public-key' })),
-        userVerification: 'required',
-        timeout: 30000
-      }
-    });
-
-    const credId   = bufferToBase64(assertion.rawId);
-    const employee = funcionarios.find(f => f.credentialId === credId);
-
-    if (employee) {
-      currentApelido = employee.apelido;
-      btn.className  = 'fp-btn success';
-      st.textContent = `Identificado: ${employee.apelido}`;
-      st.className   = 'fp-status ok';
-
-      const registrosDia = await buscarRegistrosDia(employee.apelido);
-      setTimeout(() => {
-        document.getElementById('empName').textContent = employee.apelido;
-        aplicarRegrasTipo(registrosDia);
-        showScreen('screen-tipo');
-      }, 700);
-    } else {
-      throw new Error('not found');
-    }
-
-  } catch(err) {
-    btn.className  = 'fp-btn error';
-    st.textContent = err.name === 'NotAllowedError' ? 'Cancelado' : 'Digital não reconhecida';
-    st.className   = 'fp-status err';
-    setTimeout(resetFpBtn, 3000);
-  }
 }
 
 // ── REGRAS DE TIPO ────────────────────────────────────
@@ -590,9 +579,10 @@ function saveConfig() {
   funcCache = [];
   showMsg('Configurações salvas', 'success');
   closeConfig();
+  renderFuncList();
 }
 
-// ── ENROLL (cadastro de digital) ──────────────────────
+// ── ENROLL ────────────────────────────────────────────
 async function renderEnrollList() {
   const list    = document.getElementById('enrollList');
   const loading = document.getElementById('loadingFuncionarios');
@@ -624,7 +614,6 @@ async function enrollEmployee(apelido, linha) {
     const challenge = new Uint8Array(32);
     crypto.getRandomValues(challenge);
 
-    // userId fixo baseado no apelido — garante que cada funcionário tem ID único e consistente
     const encoder = new TextEncoder();
     const apelidoBytes = encoder.encode(apelido.toLowerCase().trim().padEnd(16, '\0').substring(0, 16));
     const userId = apelidoBytes;
@@ -654,6 +643,9 @@ async function enrollEmployee(apelido, linha) {
   }
 }
 
+// ── INIT ──────────────────────────────────────────────
+renderFuncList();
+
 // ── UTILS ─────────────────────────────────────────────
 function bufferToBase64(buffer) {
   return btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
@@ -668,6 +660,7 @@ function showMsg(text, type) {
   bar.className = `msg-bar ${type} show`;
   setTimeout(() => bar.classList.remove('show'), 3000);
 }
+
 </script>
 </body>
 </html>
