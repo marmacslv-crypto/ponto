@@ -396,8 +396,12 @@ async function selecionarFuncionario(apelido) {
 
     const credId = bufferToBase64(assertion.rawId);
 
-    // Compara com o cadastrado
-    if (credId === funcionario.credentialId) {
+    // Normaliza os dois IDs para comparação robusta
+    const normaliza = s => s.replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+    const credIdNorm = normaliza(credId);
+    const cadastradoNorm = normaliza(funcionario.credentialId);
+
+    if (credIdNorm === cadastradoNorm) {
       currentApelido = apelido;
       const registrosDia = await buscarRegistrosDia(apelido);
       document.getElementById('empName').textContent = apelido;
