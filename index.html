@@ -311,7 +311,7 @@
 // ── CONFIGURAÇÕES ─────────────────────────────────────
 const DEFAULT_SHEET_PONTO    = '1T8-IPyy5QKSzzX6vT2JqxyCLmo6TH3lUQ--jFPUjH58';
 const DEFAULT_SHEET_CADASTRO = '1cHfVat4nqC8DwNESZQ4kIsCtYRXlTRwFHsWGJnWB588';
-const APPS_SCRIPT_URL        = 'https://script.google.com/macros/s/AKfycbyRg05kObeUMDwjS3J6F4AZg0KnhlyYvFlwbSMQuPKDgybf6-_1fdCpqoBrK82HFYEl/exec';
+const APPS_SCRIPT_URL        = 'https://script.google.com/macros/s/AKfycbz9ZeOiXqwyEIOPVfRIsjmeI9Fd-vpWJ-D8CPsMHjhi7TdZ2w2npT-G0P_FijsLZnXL/exec';
 
 const ABA_REGISTRO      = 'Registro';
 const ABA_FUNC_PONTO    = 'Funcionários';
@@ -323,9 +323,10 @@ let config = {
   apiKey:        localStorage.getItem('apiKey')        || ''
 };
 
-let currentApelido = null;
-let selectedTipo   = null;
-let funcCache      = [];
+let currentApelido      = null;
+let currentCredentialId = null;
+let selectedTipo        = null;
+let funcCache           = [];
 
 // ── CLOCK ─────────────────────────────────────────────
 function updateClock() {
@@ -343,7 +344,7 @@ function showScreen(id) {
 }
 
 function goHome() {
-  selectedTipo = null; currentApelido = null;
+  selectedTipo = null; currentApelido = null; currentCredentialId = null;
   document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('selected'));
   document.getElementById('btnConfirmar').disabled = true;
   showScreen('screen-home');
@@ -396,20 +397,13 @@ async function selecionarFuncionario(apelido) {
 
     const credId = bufferToBase64(assertion.rawId);
 
-    // Normaliza os dois IDs para comparação robusta
-    const normaliza = s => s.replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
-    const credIdNorm = normaliza(credId);
-    const cadastradoNorm = normaliza(funcionario.credentialId);
-
-    if (credIdNorm === cadastradoNorm) {
-      currentApelido = apelido;
-      const registrosDia = await buscarRegistrosDia(apelido);
-      document.getElementById('empName').textContent = apelido;
-      aplicarRegrasTipo(registrosDia);
-      showScreen('screen-tipo');
-    } else {
-      showMsg('Digital não corresponde! Acesso negado.', 'error');
-    }
+    // Guarda credentialId para enviar ao Apps Script
+    currentApelido = apelido;
+    currentCredentialId = credId;
+    const registrosDia = await buscarRegistrosDia(apelido);
+    document.getElementById('empName').textContent = apelido;
+    aplicarRegrasTipo(registrosDia);
+    showScreen('screen-tipo');
 
   } catch(err) {
     if (err.name === 'NotAllowedError') {
@@ -537,7 +531,7 @@ async function confirmar() {
 
   showScreen('screen-confirm');
 
-  const ok = await salvarNoSheets(currentApelido, data, hora, selectedTipo);
+  const ok = await salvarNoSheets(currentApelido, data, hora, selectedTipo, currentCredentialId);
 
   document.getElementById('savingRow').style.display       = 'none';
   document.getElementById('btnNovoRegistro').style.display = 'block';
@@ -554,11 +548,21 @@ async function confirmar() {
 }
 
 // ── GRAVAR PONTO (via Apps Script) ────────────────────
-async function salvarNoSheets(apelido, data, hora, tipo) {
+async function salvarNoSheets(apelido, data, hora, tipo, credentialId) {
   try {
-    const url = APPS_SCRIPT_URL + '?acao=salvarPonto&data=' + encodeURIComponent(data) + '&apelido=' + encodeURIComponent(apelido) + '&hora=' + encodeURIComponent(hora) + '&tipo=' + encodeURIComponent(tipo);
+    const url = APPS_SCRIPT_URL
+      + '?acao=salvarPonto'
+      + '&data=' + encodeURIComponent(data)
+      + '&apelido=' + encodeURIComponent(apelido)
+      + '&hora=' + encodeURIComponent(hora)
+      + '&tipo=' + encodeURIComponent(tipo)
+      + '&credentialId=' + encodeURIComponent(credentialId || '');
     const res = await fetch(url);
     const data2 = await res.json();
+    if (!data2.ok && data2.erro === 'DIGITAL_INVALIDA') {
+      showMsg('Digital não corresponde! Acesso negado.', 'error');
+      return false;
+    }
     return data2.ok === true;
   } catch(e) { return false; }
 }
